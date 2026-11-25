@@ -46,7 +46,12 @@ async function main() {
   const existente = await prisma.bolsa.findFirst({ where: { nombre: NOMBRE_BOLSA } });
   if (existente) {
     console.log("Borrando bolsa de prueba existente para recrearla...");
-    await prisma.bolsa.delete({ where: { id: existente.id } });
+    // aprobaciones y pagos referencian a responsables con RESTRICT: se borran antes que la bolsa.
+    await prisma.$transaction([
+      prisma.aprobacion.deleteMany({ where: { pago: { bolsaId: existente.id } } }),
+      prisma.pago.deleteMany({ where: { bolsaId: existente.id } }),
+      prisma.bolsa.delete({ where: { id: existente.id } }),
+    ]);
   }
 
   const cuota = 50;
