@@ -4,3 +4,7 @@ allowBuilds:
   core-js: false
   esbuild: true
   prisma: true
+overrides:
+  deepmerge-ts: '>=8.0.0'
+  effect: '>=3.22.1'
+  minimatch@>=7.0.0 <11.0.1: '>=11.0.1'
