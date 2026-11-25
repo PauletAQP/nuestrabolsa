@@ -25,6 +25,14 @@ export const responsableSchema = z.object({
   contrasena: z.string().min(6, "Mínimo 6 caracteres"),
 });
 
+export const crearAdminSchema = z.object({
+  nombre: z.string().min(2, "Nombre requerido"),
+  apellidos: z.string().min(2, "Apellidos requeridos"),
+  dni,
+  celular,
+  contrasena: z.string().min(6, "Mínimo 6 caracteres"),
+});
+
 export const crearBolsaSchema = z.object({
   nombre: z.string().min(3, "Nombre de la bolsa requerido"),
   colegio: z.string().min(2, "Nombre del colegio requerido"),

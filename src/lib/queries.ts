@@ -15,6 +15,17 @@ export async function requireResponsable() {
   return session;
 }
 
+export async function requireUsuario(roles?: ("superadmin" | "admin")[]) {
+  const session = await getSession();
+  if (!session || session.tipo !== "usuario") redirect("/");
+  if (roles && !roles.includes(session.rol)) redirect("/");
+  return session;
+}
+
+export async function getAportesBolsa(bolsaId: string) {
+  return prisma.aporte.findMany({ where: { bolsaId }, orderBy: { fecha: "desc" } });
+}
+
 export async function getSaldoBolsa(bolsaId: string) {
   const [aportes, pagos] = await Promise.all([
     prisma.aporte.aggregate({

@@ -24,7 +24,25 @@ const RESPONSABLES = [
   { dni: "50333444", nombre: "Gabriela", apellidos: "Torres Medina", celular: "933444555", rol: "secretario" as const },
 ];
 
+const SUPERADMIN_DNI = process.env.SUPERADMIN_DNI ?? "10000001";
+const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD ?? "superadmin2026";
+const ADMIN_DNI = "10000002";
+const ADMIN_PASSWORD = "admin2026";
+
 async function main() {
+  const sa = hashSecret(SUPERADMIN_PASSWORD);
+  const superadmin = await prisma.usuario.upsert({
+    where: { dni: SUPERADMIN_DNI },
+    update: {},
+    create: { nombre: "Super", apellidos: "Admin", dni: SUPERADMIN_DNI, celular: "900000001", rol: "superadmin", contrasenaHash: sa.hash, contrasenaSalt: sa.salt },
+  });
+  const ad = hashSecret(ADMIN_PASSWORD);
+  const admin = await prisma.usuario.upsert({
+    where: { dni: ADMIN_DNI },
+    update: {},
+    create: { nombre: "Admin", apellidos: "Demo", dni: ADMIN_DNI, celular: "900000002", rol: "admin", contrasenaHash: ad.hash, contrasenaSalt: ad.salt, createdById: superadmin.id },
+  });
+
   const existente = await prisma.bolsa.findFirst({ where: { nombre: NOMBRE_BOLSA } });
   if (existente) {
     console.log("Borrando bolsa de prueba existente para recrearla...");
@@ -45,6 +63,7 @@ async function main() {
       codigoPublico: generatePublicCode(),
       codigoInvitacion: generateInviteCode(),
       estado: "activa",
+      createdById: admin.id,
     },
   });
 
@@ -162,6 +181,8 @@ async function main() {
   console.log("Código de recuperación de los padres de prueba:", CODIGO_RECUPERACION);
   console.log("Contraseña del comité de prueba:", PASSWORD_COMITE);
   console.log("DNIs de padres:", FAMILIAS.map((f) => f.dni).join(", "));
+  console.log(`Superadmin: DNI ${SUPERADMIN_DNI} / contraseña ${SUPERADMIN_PASSWORD}`);
+  console.log(`Admin: DNI ${ADMIN_DNI} / contraseña ${ADMIN_PASSWORD}`);
   console.log("DNI del tesorero (panel del comité):", tesorero.dni);
 }
 

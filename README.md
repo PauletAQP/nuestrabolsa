@@ -1,5 +1,16 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Roles
+
+| Rol | Qué puede hacer |
+| --- | --- |
+| `superadmin` | Crear usuarios con rol administrador (`/superadmin`) |
+| `admin` | Único que puede crear bolsas y sus 3 responsables (`/admin`, `/crear`) |
+| padres (familia) | Pagar sus cuotas (`/inicio`) |
+| comité (responsables) | Proponer y aprobar retiros, ver los pagos de los padres (`/comite`) |
+
+El superadmin se crea con `pnpm db:seed` (`SUPERADMIN_DNI` / `SUPERADMIN_PASSWORD`, por defecto `10000001` / `superadmin2026`). Aplica la migración con `pnpm prisma migrate deploy`.
+
 ## Getting Started
 
 First, run the development server:

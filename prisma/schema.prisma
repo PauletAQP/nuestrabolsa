@@ -18,6 +18,11 @@ enum RolResponsable {
   secretario
 }
 
+enum RolUsuario {
+  superadmin
+  admin
+}
+
 enum MedioAporte {
   yape
   plin
@@ -54,6 +59,24 @@ enum TipoMovimiento {
 enum FuenteRegistro {
   demostracion
   stellar
+}
+
+/// Cuentas globales (no atadas a una bolsa): superadmin crea admins; admin crea bolsas.
+model Usuario {
+  id             String     @id @default(cuid())
+  nombre         String
+  apellidos      String
+  dni            String     @unique
+  celular        String
+  rol            RolUsuario
+  contrasenaHash String     @map("contrasena_hash")
+  contrasenaSalt String     @map("contrasena_salt")
+
+  createdById    String?    @map("created_by_id")
+  createdDate    DateTime   @default(now()) @map("created_date")
+  updatedDate    DateTime   @updatedAt @map("updated_date")
+
+  @@map("usuarios")
 }
 
 model Bolsa {

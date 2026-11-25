@@ -13,6 +13,7 @@ export default async function ComiteLayout({ children }: { children: React.React
         links={[
           { href: "/comite", label: "Panel" },
           { href: "/comite/proponer", label: "Proponer pago" },
+          { href: "/comite/aportes", label: "Pagos de padres" },
           { href: "/comite/familias", label: "Familias" },
           { href: "/comite/efectivo", label: "Efectivo" },
           { href: "/comite/crm", label: "CRM" },
