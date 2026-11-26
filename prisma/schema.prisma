@@ -1,0 +1,268 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EstadoBolsa {
+  activa
+  cerrada
+}
+
+enum RolResponsable {
+  tesorero
+  presidente
+  secretario
+}
+
+enum RolUsuario {
+  superadmin
+  admin
+}
+
+enum MedioAporte {
+  yape
+  plin
+  tarjeta
+  efectivo
+}
+
+enum EstadoAporte {
+  confirmado
+  por_confirmar
+}
+
+enum EstadoPago {
+  pendiente
+  pagado
+  rechazado
+  vencido
+}
+
+enum DecisionAprobacion {
+  aprobo
+  rechazo
+}
+
+enum TipoMovimiento {
+  aporte
+  pago_propuesto
+  pago_aprobado
+  pago_pagado
+  pago_rechazado
+  pago_vencido
+}
+
+enum FuenteRegistro {
+  demostracion
+  stellar
+}
+
+/// Cuentas globales (no atadas a una bolsa): superadmin crea admins; admin crea bolsas.
+model Usuario {
+  id             String     @id @default(cuid())
+  nombre         String
+  apellidos      String
+  dni            String     @unique
+  celular        String
+  rol            RolUsuario
+  contrasenaHash String     @map("contrasena_hash")
+  contrasenaSalt String     @map("contrasena_salt")
+
+  createdById    String?    @map("created_by_id")
+  createdDate    DateTime   @default(now()) @map("created_date")
+  updatedDate    DateTime   @updatedAt @map("updated_date")
+
+  @@map("usuarios")
+}
+
+model Bolsa {
+  id                 String       @id @default(cuid())
+  nombre             String
+  colegio            String
+  cuota              Decimal      @db.Decimal(10, 2)
+  estudiantesEsperados Int?       @map("estudiantes_esperados")
+  meta               Decimal?     @db.Decimal(10, 2)
+  actaUri            String?      @map("acta_uri")
+  codigoPublico      String       @unique @map("codigo_publico")
+  codigoInvitacion   String       @unique @map("codigo_invitacion")
+  estado             EstadoBolsa  @default(activa)
+
+  createdById        String?      @map("created_by_id")
+  createdDate        DateTime     @default(now()) @map("created_date")
+  updatedDate        DateTime     @updatedAt @map("updated_date")
+
+  responsables       Responsable[]
+  familias           Familia[]
+  estudiantes        Estudiante[]
+  aportes            Aporte[]
+  pagos              Pago[]
+  registros          Registro[]
+
+  @@map("bolsas")
+}
+
+model Responsable {
+  id          String         @id @default(cuid())
+  bolsaId     String         @map("bolsa_id")
+  bolsa       Bolsa          @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
+  nombre      String
+  apellidos   String
+  dni         String
+  dniFotoUri  String?        @map("dni_foto_uri")
+  celular     String
+  rol         RolResponsable @default(secretario)
+  esTesorero  Boolean        @default(false) @map("es_tesorero")
+  contrasenaHash String?     @map("contrasena_hash")
+  contrasenaSalt String?     @map("contrasena_salt")
+
+  createdById String?        @map("created_by_id")
+  createdDate DateTime       @default(now()) @map("created_date")
+  updatedDate DateTime       @updatedAt @map("updated_date")
+
+  aprobaciones Aprobacion[]
+  pagosPropuestos Pago[]
+
+  @@unique([bolsaId, dni])
+  @@map("responsables")
+}
+
+model Familia {
+  id                String   @id @default(cuid())
+  bolsaId           String   @map("bolsa_id")
+  bolsa             Bolsa    @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
+  nombre            String
+  dni               String
+  celular           String
+  contrasenaHash    String?  @map("contrasena_hash")
+  contrasenaSalt    String?  @map("contrasena_salt")
+  recuperacionHash  String?  @map("recuperacion_hash")
+  recuperacionSalt  String?  @map("recuperacion_salt")
+
+  createdById       String?  @map("created_by_id")
+  createdDate       DateTime @default(now()) @map("created_date")
+  updatedDate       DateTime @updatedAt @map("updated_date")
+
+  estudiantes       Estudiante[]
+  aportes           Aporte[]
+
+  @@unique([bolsaId, dni])
+  @@map("familias")
+}
+
+model Estudiante {
+  id          String   @id @default(cuid())
+  bolsaId     String   @map("bolsa_id")
+  bolsa       Bolsa    @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
+  familiaId   String   @map("familia_id")
+  familia     Familia  @relation(fields: [familiaId], references: [id], onDelete: Cascade)
+  nombre      String
+
+  createdById String?  @map("created_by_id")
+  createdDate DateTime @default(now()) @map("created_date")
+  updatedDate DateTime @updatedAt @map("updated_date")
+
+  aportes     Aporte[]
+
+  @@map("estudiantes")
+}
+
+model Aporte {
+  id                String       @id @default(cuid())
+  bolsaId           String       @map("bolsa_id")
+  bolsa             Bolsa        @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
+  familiaId         String       @map("familia_id")
+  familia           Familia      @relation(fields: [familiaId], references: [id], onDelete: Cascade)
+  familiaNombre     String?      @map("familia_nombre")
+  estudianteId      String?      @map("estudiante_id")
+  estudiante        Estudiante?  @relation(fields: [estudianteId], references: [id])
+  estudianteNombre  String?      @map("estudiante_nombre")
+  monto             Decimal      @db.Decimal(10, 2)
+  medio             MedioAporte
+  estado            EstadoAporte @default(confirmado)
+  registradoPor     String?      @map("registrado_por")
+  confirmadoPor     String?      @map("confirmado_por")
+  fecha             DateTime     @default(now())
+  codigoComprobante String       @unique @map("codigo_comprobante")
+  registroId        String?      @unique @map("registro_id")
+  registro          Registro?    @relation(fields: [registroId], references: [id])
+
+  createdById       String?      @map("created_by_id")
+  createdDate       DateTime     @default(now()) @map("created_date")
+  updatedDate       DateTime     @updatedAt @map("updated_date")
+
+  @@map("aportes")
+}
+
+model Pago {
+  id                String      @id @default(cuid())
+  bolsaId           String      @map("bolsa_id")
+  bolsa             Bolsa       @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
+  proveedor         String
+  cuentaProveedor   String?     @map("cuenta_proveedor")
+  monto             Decimal     @db.Decimal(10, 2)
+  motivo            String
+  proponenteId      String      @map("proponente_id")
+  proponente        Responsable @relation(fields: [proponenteId], references: [id])
+  proponenteNombre  String?     @map("proponente_nombre")
+  estado            EstadoPago  @default(pendiente)
+  venceEn           DateTime?   @map("vence_en")
+  pagadoEn          DateTime?   @map("pagado_en")
+  motivoRechazo     String?     @map("motivo_rechazo")
+  comprobanteUri    String?     @map("comprobante_uri")
+  registroId        String?     @unique @map("registro_id")
+  registro          Registro?   @relation(fields: [registroId], references: [id])
+
+  createdById       String?     @map("created_by_id")
+  createdDate       DateTime    @default(now()) @map("created_date")
+  updatedDate       DateTime    @updatedAt @map("updated_date")
+
+  aprobaciones      Aprobacion[]
+
+  @@map("pagos")
+}
+
+model Aprobacion {
+  id                String             @id @default(cuid())
+  bolsaId           String?            @map("bolsa_id")
+  pagoId            String             @map("pago_id")
+  pago              Pago               @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  responsableId     String             @map("responsable_id")
+  responsable       Responsable        @relation(fields: [responsableId], references: [id])
+  responsableNombre String?            @map("responsable_nombre")
+  decision          DecisionAprobacion
+  fecha             DateTime           @default(now())
+
+  createdById       String?            @map("created_by_id")
+  createdDate       DateTime           @default(now()) @map("created_date")
+  updatedDate       DateTime           @updatedAt @map("updated_date")
+
+  @@unique([pagoId, responsableId])
+  @@map("aprobaciones")
+}
+
+model Registro {
+  id                 String          @id @default(cuid())
+  bolsaId            String          @map("bolsa_id")
+  bolsa              Bolsa           @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
+  tipo               TipoMovimiento
+  detalle            String
+  secuencia          Int
+  codigo             String          @unique
+  anterior           String?
+  enlaceVerificable  String?         @map("enlace_verificable")
+  fuente             FuenteRegistro  @default(demostracion)
+
+  createdById        String?         @map("created_by_id")
+  createdDate        DateTime        @default(now()) @map("created_date")
+  updatedDate        DateTime        @updatedAt @map("updated_date")
+
+  aporte             Aporte?
+  pago               Pago?
+
+  @@unique([bolsaId, secuencia])
+  @@map("registros")
+}
