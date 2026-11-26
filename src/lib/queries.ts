@@ -112,26 +112,45 @@ export async function getEfectivoPorConfirmar(bolsaId: string) {
 export async function getFamiliasConAvance(bolsaId: string) {
   const familias = await prisma.familia.findMany({
     where: { bolsaId },
-    include: { estudiantes: true },
+    include: {
+      estudiantes: {
+        select: { id: true, nombre: true },
+      },
+      aportes: {
+        where: { estado: "confirmado" },
+        orderBy: { fecha: "desc" },
+      },
+    },
     orderBy: { nombre: "asc" },
   });
   const bolsa = await getBolsa(bolsaId);
-  const results = await Promise.all(
-    familias.map(async (f) => {
-      const cuotaEsperada = Number(bolsa.cuota) * Math.max(f.estudiantes.length, 1);
-      const aportado = await prisma.aporte.aggregate({
-        where: { bolsaId, familiaId: f.id, estado: "confirmado" },
-        _sum: { monto: true },
-      });
-      const totalAportado = Number(aportado._sum.monto ?? 0);
-      return {
-        familia: f,
-        cuotaEsperada,
-        totalAportado,
-        porcentaje: cuotaEsperada > 0 ? Math.min(100, Math.round((totalAportado / cuotaEsperada) * 100)) : 0,
-      };
-    })
-  );
+  const results = familias.map((f) => {
+    const cuotaEsperada = Number(bolsa.cuota) * Math.max(f.estudiantes.length, 1);
+    const totalAportado = f.aportes.reduce((acc, a) => acc + Number(a.monto), 0);
+    const saldoPendiente = Math.max(0, cuotaEsperada - totalAportado);
+    return {
+      familia: {
+        id: f.id,
+        nombre: f.nombre,
+        dni: f.dni,
+        celular: f.celular,
+        estudiantes: f.estudiantes.map((e) => ({ id: e.id, nombre: e.nombre })),
+      },
+      cuotaEsperada,
+      totalAportado,
+      saldoPendiente,
+      porcentaje: cuotaEsperada > 0 ? Math.min(100, Math.round((totalAportado / cuotaEsperada) * 100)) : 0,
+      aportes: f.aportes.map((a) => ({
+        id: a.id,
+        monto: Number(a.monto),
+        medio: a.medio,
+        estado: a.estado,
+        fecha: a.fecha,
+        estudianteNombre: a.estudianteNombre,
+        codigoComprobante: a.codigoComprobante,
+      })),
+    };
+  });
   return results;
 }
 
