@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { hashSecret, generatePublicCode, generateInviteCode } from "@/lib/crypto";
-import { createSession } from "@/lib/session";
+import { createSession, getSession } from "@/lib/session";
 import { crearBolsaSchema, unirseSchema, type CrearBolsaInput, type UnirseInput } from "@/lib/schemas";
 import { redirect } from "next/navigation";
 
@@ -11,6 +11,10 @@ export type FormResult =
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 export async function crearBolsaAction(input: CrearBolsaInput): Promise<FormResult> {
+  const session = await getSession();
+  if (!session || session.tipo !== "usuario" || session.rol !== "admin") {
+    return { ok: false, error: "Solo un administrador puede crear bolsas" };
+  }
   const parsed = crearBolsaSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -31,7 +35,7 @@ export async function crearBolsaAction(input: CrearBolsaInput): Promise<FormResu
     return { ok: false, error: "Un responsable debe tener el rol de tesorero" };
   }
 
-  const bolsa = await prisma.bolsa.create({
+  await prisma.bolsa.create({
     data: {
       nombre: data.nombre,
       colegio: data.colegio,
@@ -42,6 +46,7 @@ export async function crearBolsaAction(input: CrearBolsaInput): Promise<FormResu
       codigoPublico,
       codigoInvitacion,
       estado: "activa",
+      createdById: session.usuarioId,
       responsables: {
         create: data.responsables.map((r) => {
           const { hash, salt } = hashSecret(r.contrasena);
@@ -59,18 +64,9 @@ export async function crearBolsaAction(input: CrearBolsaInput): Promise<FormResu
         }),
       },
     },
-    include: { responsables: true },
   });
 
-  const tesoreroCreado = bolsa.responsables.find((r) => r.rol === "tesorero")!;
-  await createSession({
-    tipo: "responsable",
-    responsableId: tesoreroCreado.id,
-    bolsaId: bolsa.id,
-    rol: tesoreroCreado.rol,
-  });
-
-  redirect("/comite");
+  redirect("/admin");
 }
 
 export async function unirseAction(input: UnirseInput): Promise<FormResult> {

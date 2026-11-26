@@ -8,6 +8,7 @@ export default async function Home() {
   const session = await getSession();
   if (session?.tipo === "familia") redirect("/inicio");
   if (session?.tipo === "responsable") redirect("/comite");
+  if (session?.tipo === "usuario") redirect(session.rol === "superadmin" ? "/superadmin" : "/admin");
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 gap-10">
@@ -34,15 +35,7 @@ export default async function Home() {
         </CardContent>
       </Card>
 
-      <div className="grid w-full max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
-        <Link href="/crear" className="group">
-          <Card className="h-full transition-colors group-hover:border-primary">
-            <CardHeader>
-              <CardTitle className="text-base">Crear una bolsa</CardTitle>
-              <CardDescription>Para el comité de un salón nuevo</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
+      <div className="grid w-full max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
         <Link href="/unirse" className="group">
           <Card className="h-full transition-colors group-hover:border-primary">
             <CardHeader>
