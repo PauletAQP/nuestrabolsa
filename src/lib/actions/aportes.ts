@@ -111,6 +111,8 @@ export async function registrarEfectivoAction(input: {
   });
 
   revalidatePath("/comite/efectivo");
+  revalidatePath("/comite/crm");
+  revalidatePath("/comite");
   return { ok: true };
 }
 
@@ -143,5 +145,7 @@ export async function confirmarEfectivoAction(aporteId: string): Promise<FormRes
   });
 
   revalidatePath("/comite/efectivo");
+  revalidatePath("/comite/crm");
+  revalidatePath("/comite");
   return { ok: true };
 }

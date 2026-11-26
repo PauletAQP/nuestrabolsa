@@ -73,7 +73,23 @@ export const decidirPagoSchema = z.object({
   motivoRechazo: z.string().optional(),
 });
 
+export const editarFamiliaSchema = z.object({
+  familiaId: z.string().min(1),
+  nombre: z.string().min(2, "El nombre de la familia es requerido"),
+  dni,
+  celular,
+  estudiantes: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        nombre: z.string().min(2, "El nombre del estudiante es requerido"),
+      })
+    )
+    .min(1, "Debe registrar al menos un estudiante"),
+});
+
 export type CrearBolsaInput = z.infer<typeof crearBolsaSchema>;
 export type UnirseInput = z.infer<typeof unirseSchema>;
 export type AportarInput = z.infer<typeof aportarSchema>;
 export type ProponerPagoInput = z.infer<typeof proponerPagoSchema>;
+export type EditarFamiliaInput = z.infer<typeof editarFamiliaSchema>;
