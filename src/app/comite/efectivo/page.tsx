@@ -15,7 +15,7 @@ export default async function EfectivoPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 px-4 py-8">
-      {responsable.rol === "tesorero" ? (
+      {responsable.cargo === "tesorero" ? (
         <Card>
           <CardHeader>
             <CardTitle>Registrar efectivo recibido</CardTitle>

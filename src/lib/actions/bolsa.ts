@@ -31,9 +31,10 @@ export async function crearBolsaAction(input: CrearBolsaInput): Promise<FormResu
   const codigoInvitacion = generateInviteCode();
   const meta = data.cuota * data.estudiantesEsperados;
 
-  const tesorero = data.responsables.find((r) => r.rol === "tesorero");
-  if (!tesorero) {
-    return { ok: false, error: "Un responsable debe tener el rol de tesorero" };
+  // Un presidente, un tesorero y un secretario: cada cargo una sola vez.
+  const cargos = new Set(data.responsables.map((r) => r.cargo));
+  if (cargos.size !== data.responsables.length) {
+    return { ok: false, error: "Cada responsable debe tener un cargo distinto: presidente, tesorero y secretario" };
   }
 
   await prisma.$transaction(async (tx) => {
@@ -78,20 +79,7 @@ export async function crearBolsaAction(input: CrearBolsaInput): Promise<FormResu
         adminId: session.usuarioId,
         createdById: session.usuarioId,
         responsables: {
-          // TODO(refactor/usuario-unico): nombre, dni, celular y dniFotoUri se duplican
-          // desde Usuario hasta eliminar esas columnas de Responsable.
-          create: data.responsables.map((r, i) => {
-            const u = usuarios[i];
-            return {
-              usuarioId: u.id,
-              nombre: u.nombre,
-              apellidos: u.apellidos,
-              dni: u.dni,
-              celular: u.celular,
-              dniFotoUri: u.dniFotoUri ?? r.dniFotoUri,
-              rol: r.rol,
-            };
-          }),
+          create: data.responsables.map((r, i) => ({ usuarioId: usuarios[i].id, cargo: r.cargo })),
         },
       },
     });
@@ -144,17 +132,7 @@ export async function unirseAction(input: UnirseInput): Promise<FormResult> {
     }
     const u = usuario;
 
-    // TODO(refactor/usuario-unico): nombre, dni y celular se duplican desde Usuario
-    // hasta eliminar esas columnas de Familia.
-    const nueva = await tx.familia.create({
-      data: {
-        bolsaId: bolsa.id,
-        usuarioId: u.id,
-        nombre: `${u.nombre} ${u.apellidos}`,
-        dni: u.dni,
-        celular: u.celular,
-      },
-    });
+    const nueva = await tx.familia.create({ data: { bolsaId: bolsa.id, usuarioId: u.id } });
 
     await inscribirEstudiantes(tx, {
       bolsaId: bolsa.id,

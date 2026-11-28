@@ -12,7 +12,7 @@ export type OpcionIngreso =
       bolsaId: string;
       bolsaNombre: string;
       colegio: string;
-      rol: string;
+      cargo: string;
     };
 
 /** Paneles y membresías activas a las que puede entrar un usuario. */
@@ -28,7 +28,7 @@ export async function getOpcionesIngreso(usuarioId: string): Promise<OpcionIngre
       },
       responsables: {
         where: { bolsa: { estado: "activa" } },
-        select: { id: true, rol: true, bolsa: { select: { id: true, nombre: true, colegio: true } } },
+        select: { id: true, cargo: true, bolsa: { select: { id: true, nombre: true, colegio: true } } },
         orderBy: { createdDate: "desc" },
       },
     },
@@ -46,7 +46,7 @@ export async function getOpcionesIngreso(usuarioId: string): Promise<OpcionIngre
       bolsaId: r.bolsa.id,
       bolsaNombre: r.bolsa.nombre,
       colegio: r.bolsa.colegio,
-      rol: r.rol,
+      cargo: r.cargo,
     });
   }
   for (const f of usuario.familias) {
@@ -73,7 +73,7 @@ export function sesionParaOpcion(usuarioId: string, opcion: OpcionIngreso): Sess
         usuarioId,
         responsableId: opcion.responsableId,
         bolsaId: opcion.bolsaId,
-        rol: opcion.rol,
+        cargo: opcion.cargo,
       };
   }
 }

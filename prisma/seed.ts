@@ -20,9 +20,9 @@ const FAMILIAS = [
 ];
 
 const RESPONSABLES = [
-  { dni: "50111222", nombre: "Patricia", apellidos: "Salazar Rojas", celular: "911222333", rol: "tesorero" as const },
-  { dni: "50222333", nombre: "Fernando", apellidos: "Cárdenas Luna", celular: "922333444", rol: "presidente" as const },
-  { dni: "50333444", nombre: "Gabriela", apellidos: "Torres Medina", celular: "933444555", rol: "secretario" as const },
+  { dni: "50111222", nombre: "Patricia", apellidos: "Salazar Rojas", celular: "911222333", cargo: "tesorero" as const },
+  { dni: "50222333", nombre: "Fernando", apellidos: "Cárdenas Luna", celular: "922333444", cargo: "presidente" as const },
+  { dni: "50333444", nombre: "Gabriela", apellidos: "Torres Medina", celular: "933444555", cargo: "secretario" as const },
 ];
 
 // Segunda bolsa para probar el ingreso con varias membresías (/elegir):
@@ -30,9 +30,9 @@ const RESPONSABLES = [
 // - Rosa Elena es madre de familia en ambas bolsas y además secretaria aquí.
 const NOMBRE_BOLSA_2 = "Bolsa 5B · Viaje de promoción";
 const RESPONSABLES_BOLSA_2 = [
-  { dni: "50111222", rol: "presidente" as const },
-  { dni: "50222333", rol: "tesorero" as const },
-  { dni: "40123456", rol: "secretario" as const },
+  { dni: "50111222", cargo: "presidente" as const },
+  { dni: "50222333", cargo: "tesorero" as const },
+  { dni: "40123456", cargo: "secretario" as const },
 ];
 const FAMILIAS_BOLSA_2 = ["40123456", "41234567"];
 
@@ -43,26 +43,12 @@ const ADMIN_PASSWORD = "admin2026";
 
 type UsuarioSeed = { id: string; nombre: string; apellidos: string; dni: string; celular: string };
 
-async function crearResponsable(bolsaId: string, u: UsuarioSeed, rol: "tesorero" | "presidente" | "secretario") {
-  // nombre, dni y celular se duplican desde Usuario hasta eliminar esas columnas de Responsable.
-  return prisma.responsable.create({
-    data: {
-      bolsaId,
-      usuarioId: u.id,
-      nombre: u.nombre,
-      apellidos: u.apellidos,
-      dni: u.dni,
-      celular: u.celular,
-      rol,
-    },
-  });
+async function crearResponsable(bolsaId: string, u: UsuarioSeed, cargo: "tesorero" | "presidente" | "secretario") {
+  return prisma.responsable.create({ data: { bolsaId, usuarioId: u.id, cargo } });
 }
 
 async function crearFamilia(bolsaId: string, u: UsuarioSeed, nombresEstudiantes: string[]) {
-  // nombre, dni y celular se duplican desde Usuario hasta eliminar esas columnas de Familia.
-  const familia = await prisma.familia.create({
-    data: { bolsaId, usuarioId: u.id, nombre: `${u.nombre} ${u.apellidos}`, dni: u.dni, celular: u.celular },
-  });
+  const familia = await prisma.familia.create({ data: { bolsaId, usuarioId: u.id } });
   // Si el padre ya inscribió a sus hijos en otra bolsa, se reutilizan los mismos estudiantes.
   const estudiantes = await inscribirEstudiantes(prisma, {
     bolsaId,
@@ -70,7 +56,7 @@ async function crearFamilia(bolsaId: string, u: UsuarioSeed, nombresEstudiantes:
     apoderadoId: u.id,
     nombres: nombresEstudiantes,
   });
-  return { familia, estudiantes };
+  return { familia: { id: familia.id, nombre: `${u.nombre} ${u.apellidos}` }, estudiantes };
 }
 
 async function main() {
@@ -156,7 +142,7 @@ async function main() {
   });
 
   for (const r of RESPONSABLES) {
-    await crearResponsable(bolsa.id, usuario(r.dni), r.rol);
+    await crearResponsable(bolsa.id, usuario(r.dni), r.cargo);
   }
 
   const idsEstudiantesPorFamilia: { familiaId: string; estudianteId: string; nombre: string; familiaNombre: string }[] = [];
@@ -200,7 +186,15 @@ async function main() {
   }
 
   // Un pago ya propuesto por el tesorero, esperando aprobaciones.
-  const tesorero = await prisma.responsable.findFirstOrThrow({ where: { bolsaId: bolsa.id, rol: "tesorero" } });
+  const tesoreroResp = await prisma.responsable.findFirstOrThrow({
+    where: { bolsaId: bolsa.id, cargo: "tesorero" },
+    include: { usuario: true },
+  });
+  const tesorero = {
+    id: tesoreroResp.id,
+    nombre: `${tesoreroResp.usuario.nombre} ${tesoreroResp.usuario.apellidos}`,
+    dni: tesoreroResp.usuario.dni,
+  };
   await prisma.$transaction(async (tx) => {
     const registro = await appendRegistro(tx, {
       bolsaId: bolsa.id,
@@ -246,7 +240,7 @@ async function main() {
     },
   });
   for (const r of RESPONSABLES_BOLSA_2) {
-    await crearResponsable(bolsa2.id, usuario(r.dni), r.rol);
+    await crearResponsable(bolsa2.id, usuario(r.dni), r.cargo);
   }
   for (const dni of FAMILIAS_BOLSA_2) {
     const f = FAMILIAS.find((x) => x.dni === dni)!;

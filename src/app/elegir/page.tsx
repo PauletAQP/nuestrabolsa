@@ -24,7 +24,7 @@ function describir(o: OpcionIngreso): { titulo: string; detalle: string; id: str
     case "responsable":
       return {
         titulo: o.bolsaNombre,
-        detalle: `${o.colegio} · Comité (${CARGO_LABEL[o.rol] ?? o.rol})`,
+        detalle: `${o.colegio} · Comité (${CARGO_LABEL[o.cargo] ?? o.cargo})`,
         id: o.responsableId,
       };
     case "familia":

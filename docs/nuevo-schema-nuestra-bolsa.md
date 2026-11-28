@@ -1,8 +1,8 @@
-# Nuestra Bolsa — Diagrama ER propuesto
+# Nuestra Bolsa — Diagrama ER
 
-Propuesta de rediseño del modelo de datos. Separa la **identidad** de la persona (`Usuario`) de sus **membresías** por bolsa (`Familia`, `Responsable`), de modo que una persona y sus hijos puedan participar en varias bolsas (viaje de promoción, fiesta de promoción, etc.).
+Modelo de datos con cuenta única. Separa la **identidad** de la persona (`Usuario`) de sus **membresías** por bolsa (`Familia`, `Responsable`), de modo que una persona y sus hijos puedan participar en varias bolsas (viaje de promoción, fiesta de promoción, etc.).
 
-El modelo vigente está descrito en [base-de-datos-nuestra-bolsa.md](base-de-datos-nuestra-bolsa.md).
+Implementado en la rama `refactor/schema`. El detalle de cada campo está en [base-de-datos-nuestra-bolsa.md](base-de-datos-nuestra-bolsa.md). Las secciones "Qué cambia respecto al modelo actual" y "Cuidados al migrar" describen la migración desde el modelo anterior.
 
 ## Diagrama
 

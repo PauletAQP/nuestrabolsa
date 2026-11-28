@@ -17,7 +17,7 @@ export type SessionPayload =
   | { tipo: "pendiente"; usuarioId: string }
   | { tipo: "usuario"; usuarioId: string; rol: "superadmin" | "admin" }
   | { tipo: "familia"; usuarioId: string; familiaId: string; bolsaId: string }
-  | { tipo: "responsable"; usuarioId: string; responsableId: string; bolsaId: string; rol: string };
+  | { tipo: "responsable"; usuarioId: string; responsableId: string; bolsaId: string; cargo: string };
 
 export async function createSession(payload: SessionPayload) {
   const token = await new SignJWT({ ...payload })

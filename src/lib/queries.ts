@@ -35,7 +35,6 @@ const familiaInclude = {
 type FamiliaConUsuario = Prisma.FamiliaGetPayload<{ include: typeof familiaInclude }>;
 
 function datosFamilia(f: FamiliaConUsuario) {
-  if (!f.usuario) throw new Error(`La familia ${f.id} no tiene un usuario asociado`);
   return {
     id: f.id,
     bolsaId: f.bolsaId,
@@ -186,12 +185,9 @@ export async function getResponsables(bolsaId: string) {
   const responsables = await prisma.responsable.findMany({
     where: { bolsaId },
     include: { usuario: { select: { nombre: true, apellidos: true, dni: true, celular: true } } },
-    orderBy: { rol: "asc" },
+    orderBy: { cargo: "asc" },
   });
-  return responsables.map((r) => {
-    if (!r.usuario) throw new Error(`El responsable ${r.id} no tiene un usuario asociado`);
-    return { id: r.id, rol: r.rol, ...r.usuario };
-  });
+  return responsables.map((r) => ({ id: r.id, cargo: r.cargo, ...r.usuario }));
 }
 
 /** Nombre completo del responsable (desde su Usuario), para registrar quién hizo cada acción. */
@@ -200,6 +196,5 @@ export async function getNombreResponsable(responsableId: string) {
     where: { id: responsableId },
     select: { usuario: { select: { nombre: true, apellidos: true } } },
   });
-  if (!r.usuario) throw new Error(`El responsable ${responsableId} no tiene un usuario asociado`);
   return `${r.usuario.nombre} ${r.usuario.apellidos}`;
 }

@@ -79,7 +79,7 @@ export default async function PagoDetallePage({ params }: { params: Promise<{ id
               return (
                 <li key={r.id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
                   <span>
-                    {r.nombre} {r.apellidos} · <span className="text-muted-foreground">{r.rol}</span>
+                    {r.nombre} {r.apellidos} · <span className="text-muted-foreground">{r.cargo}</span>
                   </span>
                   {!aprobacion ? (
                     <span className="flex items-center gap-1 text-muted-foreground">

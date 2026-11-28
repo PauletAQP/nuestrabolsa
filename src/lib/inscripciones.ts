@@ -23,9 +23,7 @@ export async function inscribirEstudiantes(
     const estudiante =
       previo ??
       (await tx.estudiante.create({
-        // TODO(refactor/usuario-unico): bolsaId y familiaId se eliminan de Estudiante;
-        // la relación con la bolsa vive en Inscripcion.
-        data: { bolsaId: input.bolsaId, familiaId: input.familiaId, apoderadoId: input.apoderadoId, nombre: nombre.trim() },
+        data: { apoderadoId: input.apoderadoId, nombre: nombre.trim() },
       }));
     await tx.inscripcion.create({
       data: { bolsaId: input.bolsaId, familiaId: input.familiaId, estudianteId: estudiante.id },

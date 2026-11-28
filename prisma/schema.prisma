@@ -12,7 +12,8 @@ enum EstadoBolsa {
   cerrada
 }
 
-enum RolResponsable {
+/// Cargo de un responsable dentro del comité de una bolsa (uno por cargo y bolsa).
+enum CargoResponsable {
   tesorero
   presidente
   secretario
@@ -116,8 +117,8 @@ model Bolsa {
   codigoPublico        String      @unique @map("codigo_publico")
   codigoInvitacion     String      @unique @map("codigo_invitacion")
   estado               EstadoBolsa @default(activa)
-  adminId              String?     @map("admin_id")
-  admin                Usuario?    @relation(fields: [adminId], references: [id], onDelete: NoAction)
+  adminId              String      @map("admin_id")
+  admin                Usuario     @relation(fields: [adminId], references: [id], onDelete: NoAction)
 
   createdById String?  @map("created_by_id")
   createdDate DateTime @default(now()) @map("created_date")
@@ -125,7 +126,6 @@ model Bolsa {
 
   responsables  Responsable[]
   familias      Familia[]
-  estudiantes   Estudiante[]
   inscripciones Inscripcion[]
   aportes       Aporte[]
   pagos         Pago[]
@@ -135,21 +135,14 @@ model Bolsa {
   @@map("bolsas")
 }
 
+/// Membresía de un Usuario en el comité de una bolsa. Los datos personales viven en Usuario.
 model Responsable {
-  id             String         @id @default(cuid())
-  bolsaId        String         @map("bolsa_id")
-  bolsa          Bolsa          @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
-  nombre         String
-  apellidos      String
-  dni            String
-  dniFotoUri     String?        @map("dni_foto_uri")
-  celular        String
-  rol            RolResponsable @default(secretario)
-  esTesorero     Boolean        @default(false) @map("es_tesorero")
-  contrasenaHash String?        @map("contrasena_hash")
-  contrasenaSalt String?        @map("contrasena_salt")
-  usuarioId      String?        @map("usuario_id")
-  usuario        Usuario?       @relation(fields: [usuarioId], references: [id], onDelete: NoAction)
+  id        String           @id @default(cuid())
+  bolsaId   String           @map("bolsa_id")
+  bolsa     Bolsa            @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
+  usuarioId String           @map("usuario_id")
+  usuario   Usuario          @relation(fields: [usuarioId], references: [id], onDelete: NoAction)
+  cargo     CargoResponsable
 
   createdById String?  @map("created_by_id")
   createdDate DateTime @default(now()) @map("created_date")
@@ -161,52 +154,41 @@ model Responsable {
   aportesConfirmados    Aporte[]       @relation("AporteConfirmadoPor")
   recordatoriosEnviados Recordatorio[]
 
-  @@unique([bolsaId, dni])
   @@unique([bolsaId, usuarioId])
+  @@unique([bolsaId, cargo])
   @@map("responsables")
 }
 
+/// Membresía de un Usuario (padre o madre) en una bolsa. Los datos personales viven en Usuario.
 model Familia {
-  id               String        @id @default(cuid())
-  bolsaId          String        @map("bolsa_id")
-  bolsa            Bolsa         @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
-  nombre           String
-  dni              String
-  celular          String
-  contrasenaHash   String?       @map("contrasena_hash")
-  contrasenaSalt   String?       @map("contrasena_salt")
-  recuperacionHash String?       @map("recuperacion_hash")
-  recuperacionSalt String?       @map("recuperacion_salt")
-  usuarioId        String?       @map("usuario_id")
-  usuario          Usuario?      @relation(fields: [usuarioId], references: [id], onDelete: NoAction)
-  estado           EstadoFamilia @default(activa)
-  retiradaEn       DateTime?     @map("retirada_en")
+  id         String        @id @default(cuid())
+  bolsaId    String        @map("bolsa_id")
+  bolsa      Bolsa         @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
+  usuarioId  String        @map("usuario_id")
+  usuario    Usuario       @relation(fields: [usuarioId], references: [id], onDelete: NoAction)
+  estado     EstadoFamilia @default(activa)
+  retiradaEn DateTime?     @map("retirada_en")
 
   createdById String?  @map("created_by_id")
   createdDate DateTime @default(now()) @map("created_date")
   updatedDate DateTime @updatedAt @map("updated_date")
 
-  estudiantes   Estudiante[]
   inscripciones Inscripcion[]
   aportes       Aporte[]
   devoluciones  Pago[]
   recordatorios Recordatorio[]
 
-  @@unique([bolsaId, dni])
   @@unique([bolsaId, usuarioId])
   @@map("familias")
 }
 
+/// Hijo o hija de un apoderado. Participa en una o varias bolsas a través de Inscripcion.
 model Estudiante {
-  id          String   @id @default(cuid())
-  bolsaId     String   @map("bolsa_id")
-  bolsa       Bolsa    @relation(fields: [bolsaId], references: [id], onDelete: Cascade)
-  familiaId   String   @map("familia_id")
-  familia     Familia  @relation(fields: [familiaId], references: [id], onDelete: Cascade)
+  id          String  @id @default(cuid())
+  apoderadoId String  @map("apoderado_id")
+  apoderado   Usuario @relation(fields: [apoderadoId], references: [id], onDelete: NoAction)
   nombre      String
   apellidos   String?
-  apoderadoId String?  @map("apoderado_id")
-  apoderado   Usuario? @relation(fields: [apoderadoId], references: [id], onDelete: NoAction)
 
   createdById String?  @map("created_by_id")
   createdDate DateTime @default(now()) @map("created_date")
@@ -249,8 +231,6 @@ model Aporte {
   monto               Decimal      @db.Decimal(10, 2)
   medio               MedioAporte
   estado              EstadoAporte @default(confirmado)
-  registradoPor       String?      @map("registrado_por")
-  confirmadoPor       String?      @map("confirmado_por")
   /// Responsable del comité que registró el aporte en nombre del padre (null = lo registró el propio padre).
   registradoPorId     String?      @map("registrado_por_id")
   registradoPorResp   Responsable? @relation("AporteRegistradoPor", fields: [registradoPorId], references: [id], onDelete: NoAction)

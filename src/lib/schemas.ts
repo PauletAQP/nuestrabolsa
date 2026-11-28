@@ -20,7 +20,7 @@ export const responsableSchema = z.object({
   apellidos: z.string().min(2, "Apellidos requeridos"),
   dni,
   celular,
-  rol: z.enum(["tesorero", "presidente", "secretario"]),
+  cargo: z.enum(["tesorero", "presidente", "secretario"]),
   dniFotoUri: z.string().optional(),
   contrasena: z.string().min(6, "Mínimo 6 caracteres"),
 });
