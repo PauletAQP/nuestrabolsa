@@ -14,8 +14,8 @@ import { formatSoles } from "@/lib/format";
 
 type Responsable = CrearBolsaInput["responsables"][number];
 
-const ROLES: Responsable["rol"][] = ["tesorero", "presidente", "secretario"];
-const ROL_LABEL: Record<Responsable["rol"], string> = {
+const ROLES: Responsable["cargo"][] = ["tesorero", "presidente", "secretario"];
+const ROL_LABEL: Record<Responsable["cargo"], string> = {
   tesorero: "Tesorero",
   presidente: "Presidente",
   secretario: "Secretario",
@@ -26,7 +26,7 @@ const RESPONSABLE_VACIO: Responsable = {
   apellidos: "",
   dni: "",
   celular: "",
-  rol: "tesorero",
+  cargo: "tesorero",
   dniFotoUri: undefined,
   contrasena: "",
 };
@@ -39,9 +39,9 @@ export function CrearBolsaWizard() {
   const [estudiantesEsperados, setEstudiantesEsperados] = useState("");
   const [actaUri, setActaUri] = useState<string | undefined>();
   const [responsables, setResponsables] = useState<Responsable[]>([
-    { ...RESPONSABLE_VACIO, rol: "tesorero" },
-    { ...RESPONSABLE_VACIO, rol: "presidente" },
-    { ...RESPONSABLE_VACIO, rol: "secretario" },
+    { ...RESPONSABLE_VACIO, cargo: "tesorero" },
+    { ...RESPONSABLE_VACIO, cargo: "presidente" },
+    { ...RESPONSABLE_VACIO, cargo: "secretario" },
   ]);
   const [pending, startTransition] = useTransition();
 
@@ -150,8 +150,8 @@ export function CrearBolsaWizard() {
                   <p className="text-sm font-medium">Responsable {i + 1}</p>
                   <Select
                     items={Object.fromEntries(ROLES.map((rol) => [rol, ROL_LABEL[rol]]))}
-                    value={r.rol}
-                    onValueChange={(v) => v && actualizarResponsable(i, "rol", v)}
+                    value={r.cargo}
+                    onValueChange={(v) => v && actualizarResponsable(i, "cargo", v)}
                   >
                     <SelectTrigger className="w-40">
                       <SelectValue />
@@ -214,7 +214,7 @@ export function CrearBolsaWizard() {
               </p>
               <p>
                 <span className="text-muted-foreground">Comité:</span>{" "}
-                {responsables.map((r) => `${r.nombre} (${ROL_LABEL[r.rol]})`).join(", ")}
+                {responsables.map((r) => `${r.nombre} (${ROL_LABEL[r.cargo]})`).join(", ")}
               </p>
             </div>
             <p className="text-xs text-muted-foreground">

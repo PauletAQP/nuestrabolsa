@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { appendRegistro } from "@/lib/registro";
 import { generateComprobanteCode } from "@/lib/crypto";
 import { getSession } from "@/lib/session";
+import { getFamiliaConEstudiantes, getNombreResponsable } from "@/lib/queries";
 import { aportarSchema, type AportarInput } from "@/lib/schemas";
 import { revalidatePath } from "next/cache";
 
@@ -33,14 +34,11 @@ export async function aportarAction(input: AportarInput): Promise<FormResult> {
     return { ok: false, error: "El efectivo lo registra el tesorero" };
   }
 
-  const estudiante = await prisma.estudiante.findFirst({
-    where: { id: data.estudianteId, familiaId: session.familiaId },
-  });
+  const familia = await getFamiliaConEstudiantes(session.familiaId);
+  const estudiante = familia.estudiantes.find((e) => e.id === data.estudianteId);
   if (!estudiante) {
     return { ok: false, error: "Ese estudiante no pertenece a tu familia" };
   }
-
-  const familia = await prisma.familia.findUniqueOrThrow({ where: { id: session.familiaId } });
   const codigoComprobante = await uniqueComprobanteCode();
 
   await prisma.$transaction(async (tx) => {
@@ -60,7 +58,7 @@ export async function aportarAction(input: AportarInput): Promise<FormResult> {
         monto: data.monto,
         medio: data.medio,
         estado: "confirmado",
-        registradoPor: familia.id,
+        // registradoPorId = null: lo registró el propio padre.
         codigoComprobante,
         registroId: registro.id,
       },
@@ -85,15 +83,20 @@ export async function registrarEfectivoAction(input: {
     return { ok: false, error: "El monto mínimo es S/ 1" };
   }
 
-  const estudiante = await prisma.estudiante.findFirst({
-    where: { id: input.estudianteId, familiaId: input.familiaId, bolsaId: session.bolsaId },
+  const enBolsa = await prisma.familia.findFirst({
+    where: { id: input.familiaId, bolsaId: session.bolsaId, estado: "activa" },
+    select: { id: true },
   });
-  const familia = await prisma.familia.findFirst({ where: { id: input.familiaId, bolsaId: session.bolsaId } });
+  const familia = enBolsa ? await getFamiliaConEstudiantes(enBolsa.id) : null;
+  const estudiante = familia?.estudiantes.find((e) => e.id === input.estudianteId);
   if (!estudiante || !familia) {
     return { ok: false, error: "Familia o estudiante no encontrados en esta bolsa" };
   }
 
-  const codigoComprobante = await uniqueComprobanteCode();
+  const [codigoComprobante, registradoPorNombre] = await Promise.all([
+    uniqueComprobanteCode(),
+    getNombreResponsable(session.responsableId),
+  ]);
 
   await prisma.aporte.create({
     data: {
@@ -105,7 +108,8 @@ export async function registrarEfectivoAction(input: {
       monto: input.monto,
       medio: "efectivo",
       estado: "por_confirmar",
-      registradoPor: session.responsableId,
+      registradoPorId: session.responsableId,
+      registradoPorNombre,
       codigoComprobante,
     },
   });
@@ -127,7 +131,7 @@ export async function confirmarEfectivoAction(aporteId: string): Promise<FormRes
   if (!aporte || aporte.estado !== "por_confirmar") {
     return { ok: false, error: "Este aporte ya no está pendiente de confirmación" };
   }
-  if (aporte.registradoPor === session.responsableId) {
+  if (aporte.registradoPorId === session.responsableId) {
     return { ok: false, error: "Otro responsable debe confirmar este efectivo, no quien lo registró" };
   }
 
@@ -140,7 +144,7 @@ export async function confirmarEfectivoAction(aporteId: string): Promise<FormRes
 
     await tx.aporte.update({
       where: { id: aporte.id },
-      data: { estado: "confirmado", confirmadoPor: session.responsableId, registroId: registro.id },
+      data: { estado: "confirmado", confirmadoPorId: session.responsableId, registroId: registro.id },
     });
   });
 

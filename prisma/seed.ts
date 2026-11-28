@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { hashSecret, generatePublicCode, generateInviteCode, generateComprobanteCode } from "../src/lib/crypto";
 import { appendRegistro } from "../src/lib/registro";
+import { inscribirEstudiantes } from "../src/lib/inscripciones";
 
 const prisma = new PrismaClient();
 
@@ -10,24 +11,53 @@ const CODIGO_RECUPERACION = "DEMO-2026";
 const PASSWORD_COMITE = "comite2026";
 
 const FAMILIAS = [
-  { dni: "40123456", nombre: "Rosa Elena Quispe Mamani", estudiantes: ["Ana Quispe", "Luis Quispe"] },
-  { dni: "41234567", nombre: "Julio César Ramos Torres", estudiantes: ["Diego Ramos"] },
-  { dni: "42345678", nombre: "María Fernanda Flores Ríos", estudiantes: ["Camila Flores"] },
-  { dni: "43456789", nombre: "Carlos Alberto Mendoza Vega", estudiantes: ["Sofía Mendoza", "Mateo Mendoza"] },
-  { dni: "44567890", nombre: "Ana Lucía Paredes Ccahuana", estudiantes: ["Valeria Paredes"] },
-  { dni: "45678901", nombre: "Jorge Luis Huamán Quispe", estudiantes: ["Sebastián Huamán"] },
+  { dni: "40123456", nombre: "Rosa Elena", apellidos: "Quispe Mamani", estudiantes: ["Ana Quispe", "Luis Quispe"] },
+  { dni: "41234567", nombre: "Julio César", apellidos: "Ramos Torres", estudiantes: ["Diego Ramos"] },
+  { dni: "42345678", nombre: "María Fernanda", apellidos: "Flores Ríos", estudiantes: ["Camila Flores"] },
+  { dni: "43456789", nombre: "Carlos Alberto", apellidos: "Mendoza Vega", estudiantes: ["Sofía Mendoza", "Mateo Mendoza"] },
+  { dni: "44567890", nombre: "Ana Lucía", apellidos: "Paredes Ccahuana", estudiantes: ["Valeria Paredes"] },
+  { dni: "45678901", nombre: "Jorge Luis", apellidos: "Huamán Quispe", estudiantes: ["Sebastián Huamán"] },
 ];
 
 const RESPONSABLES = [
-  { dni: "50111222", nombre: "Patricia", apellidos: "Salazar Rojas", celular: "911222333", rol: "tesorero" as const },
-  { dni: "50222333", nombre: "Fernando", apellidos: "Cárdenas Luna", celular: "922333444", rol: "presidente" as const },
-  { dni: "50333444", nombre: "Gabriela", apellidos: "Torres Medina", celular: "933444555", rol: "secretario" as const },
+  { dni: "50111222", nombre: "Patricia", apellidos: "Salazar Rojas", celular: "911222333", cargo: "tesorero" as const },
+  { dni: "50222333", nombre: "Fernando", apellidos: "Cárdenas Luna", celular: "922333444", cargo: "presidente" as const },
+  { dni: "50333444", nombre: "Gabriela", apellidos: "Torres Medina", celular: "933444555", cargo: "secretario" as const },
 ];
+
+// Segunda bolsa para probar el ingreso con varias membresías (/elegir):
+// - Patricia (tesorera en la bolsa 1) es presidenta aquí.
+// - Rosa Elena es madre de familia en ambas bolsas y además secretaria aquí.
+const NOMBRE_BOLSA_2 = "Bolsa 5B · Viaje de promoción";
+const RESPONSABLES_BOLSA_2 = [
+  { dni: "50111222", cargo: "presidente" as const },
+  { dni: "50222333", cargo: "tesorero" as const },
+  { dni: "40123456", cargo: "secretario" as const },
+];
+const FAMILIAS_BOLSA_2 = ["40123456", "41234567"];
 
 const SUPERADMIN_DNI = process.env.SUPERADMIN_DNI ?? "10000001";
 const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD ?? "superadmin2026";
 const ADMIN_DNI = "10000002";
 const ADMIN_PASSWORD = "admin2026";
+
+type UsuarioSeed = { id: string; nombre: string; apellidos: string; dni: string; celular: string };
+
+async function crearResponsable(bolsaId: string, u: UsuarioSeed, cargo: "tesorero" | "presidente" | "secretario") {
+  return prisma.responsable.create({ data: { bolsaId, usuarioId: u.id, cargo } });
+}
+
+async function crearFamilia(bolsaId: string, u: UsuarioSeed, nombresEstudiantes: string[]) {
+  const familia = await prisma.familia.create({ data: { bolsaId, usuarioId: u.id } });
+  // Si el padre ya inscribió a sus hijos en otra bolsa, se reutilizan los mismos estudiantes.
+  const estudiantes = await inscribirEstudiantes(prisma, {
+    bolsaId,
+    familiaId: familia.id,
+    apoderadoId: u.id,
+    nombres: nombresEstudiantes,
+  });
+  return { familia: { id: familia.id, nombre: `${u.nombre} ${u.apellidos}` }, estudiantes };
+}
 
 async function main() {
   const sa = hashSecret(SUPERADMIN_PASSWORD);
@@ -43,16 +73,54 @@ async function main() {
     create: { nombre: "Admin", apellidos: "Demo", dni: ADMIN_DNI, celular: "900000002", rol: "admin", contrasenaHash: ad.hash, contrasenaSalt: ad.salt, createdById: superadmin.id },
   });
 
-  const existente = await prisma.bolsa.findFirst({ where: { nombre: NOMBRE_BOLSA } });
-  if (existente) {
-    console.log("Borrando bolsa de prueba existente para recrearla...");
-    // aprobaciones y pagos referencian a responsables con RESTRICT: se borran antes que la bolsa.
+  for (const nombre of [NOMBRE_BOLSA, NOMBRE_BOLSA_2]) {
+    const existente = await prisma.bolsa.findFirst({ where: { nombre } });
+    if (!existente) continue;
+    console.log(`Borrando "${nombre}" para recrearla...`);
+    // aprobaciones y pagos referencian a responsables: se borran antes que la bolsa.
     await prisma.$transaction([
       prisma.aprobacion.deleteMany({ where: { pago: { bolsaId: existente.id } } }),
       prisma.pago.deleteMany({ where: { bolsaId: existente.id } }),
       prisma.bolsa.delete({ where: { id: existente.id } }),
     ]);
   }
+
+  // Cuentas únicas (Usuario) de responsables y padres.
+  const usuarioPorDni = new Map<string, UsuarioSeed>();
+  for (const r of RESPONSABLES) {
+    const { hash, salt } = hashSecret(PASSWORD_COMITE);
+    const u = await prisma.usuario.upsert({
+      where: { dni: r.dni },
+      update: {},
+      create: { nombre: r.nombre, apellidos: r.apellidos, dni: r.dni, celular: r.celular, rol: "usuario", contrasenaHash: hash, contrasenaSalt: salt },
+    });
+    usuarioPorDni.set(r.dni, u);
+  }
+  for (const f of FAMILIAS) {
+    const pass = hashSecret(PASSWORD_PADRES);
+    const rec = hashSecret(CODIGO_RECUPERACION);
+    const u = await prisma.usuario.upsert({
+      where: { dni: f.dni },
+      update: {},
+      create: {
+        nombre: f.nombre,
+        apellidos: f.apellidos,
+        dni: f.dni,
+        celular: "9" + f.dni.slice(0, 8),
+        rol: "usuario",
+        contrasenaHash: pass.hash,
+        contrasenaSalt: pass.salt,
+        recuperacionHash: rec.hash,
+        recuperacionSalt: rec.salt,
+      },
+    });
+    usuarioPorDni.set(f.dni, u);
+  }
+  const usuario = (dni: string): UsuarioSeed => {
+    const u = usuarioPorDni.get(dni);
+    if (!u) throw new Error(`Usuario ${dni} no definido en el seed`);
+    return u;
+  };
 
   const cuota = 50;
   const estudiantesEsperados = 32;
@@ -68,53 +136,24 @@ async function main() {
       codigoPublico: generatePublicCode(),
       codigoInvitacion: generateInviteCode(),
       estado: "activa",
+      adminId: admin.id,
       createdById: admin.id,
     },
   });
 
   for (const r of RESPONSABLES) {
-    const { hash, salt } = hashSecret(PASSWORD_COMITE);
-    await prisma.responsable.create({
-      data: {
-        bolsaId: bolsa.id,
-        nombre: r.nombre,
-        apellidos: r.apellidos,
-        dni: r.dni,
-        celular: r.celular,
-        rol: r.rol,
-        esTesorero: r.rol === "tesorero",
-        contrasenaHash: hash,
-        contrasenaSalt: salt,
-      },
-    });
+    await crearResponsable(bolsa.id, usuario(r.dni), r.cargo);
   }
 
   const idsEstudiantesPorFamilia: { familiaId: string; estudianteId: string; nombre: string; familiaNombre: string }[] = [];
 
   for (const f of FAMILIAS) {
-    const { hash, salt } = hashSecret(PASSWORD_PADRES);
-    const { hash: recHash, salt: recSalt } = hashSecret(CODIGO_RECUPERACION);
-    const familia = await prisma.familia.create({
-      data: {
-        bolsaId: bolsa.id,
-        nombre: f.nombre,
-        dni: f.dni,
-        celular: "9" + f.dni.slice(0, 8),
-        contrasenaHash: hash,
-        contrasenaSalt: salt,
-        recuperacionHash: recHash,
-        recuperacionSalt: recSalt,
-      },
-    });
-
-    for (const nombreEstudiante of f.estudiantes) {
-      const estudiante = await prisma.estudiante.create({
-        data: { bolsaId: bolsa.id, familiaId: familia.id, nombre: nombreEstudiante },
-      });
+    const { familia, estudiantes } = await crearFamilia(bolsa.id, usuario(f.dni), f.estudiantes);
+    for (const e of estudiantes) {
       idsEstudiantesPorFamilia.push({
         familiaId: familia.id,
-        estudianteId: estudiante.id,
-        nombre: nombreEstudiante,
+        estudianteId: e.id,
+        nombre: e.nombre,
         familiaNombre: familia.nombre,
       });
     }
@@ -139,7 +178,6 @@ async function main() {
           monto: cuota,
           medio: "yape",
           estado: "confirmado",
-          registradoPor: e.familiaId,
           codigoComprobante: generateComprobanteCode(),
           registroId: registro.id,
         },
@@ -148,7 +186,15 @@ async function main() {
   }
 
   // Un pago ya propuesto por el tesorero, esperando aprobaciones.
-  const tesorero = await prisma.responsable.findFirstOrThrow({ where: { bolsaId: bolsa.id, rol: "tesorero" } });
+  const tesoreroResp = await prisma.responsable.findFirstOrThrow({
+    where: { bolsaId: bolsa.id, cargo: "tesorero" },
+    include: { usuario: true },
+  });
+  const tesorero = {
+    id: tesoreroResp.id,
+    nombre: `${tesoreroResp.usuario.nombre} ${tesoreroResp.usuario.apellidos}`,
+    dni: tesoreroResp.usuario.dni,
+  };
   await prisma.$transaction(async (tx) => {
     const registro = await appendRegistro(tx, {
       bolsaId: bolsa.id,
@@ -179,6 +225,28 @@ async function main() {
     });
   });
 
+  const bolsa2 = await prisma.bolsa.create({
+    data: {
+      nombre: NOMBRE_BOLSA_2,
+      colegio: "I.E. Nuestra Señora de la Esperanza",
+      cuota: 100,
+      estudiantesEsperados: 32,
+      meta: 100 * 32,
+      codigoPublico: generatePublicCode(),
+      codigoInvitacion: generateInviteCode(),
+      estado: "activa",
+      adminId: admin.id,
+      createdById: admin.id,
+    },
+  });
+  for (const r of RESPONSABLES_BOLSA_2) {
+    await crearResponsable(bolsa2.id, usuario(r.dni), r.cargo);
+  }
+  for (const dni of FAMILIAS_BOLSA_2) {
+    const f = FAMILIAS.find((x) => x.dni === dni)!;
+    await crearFamilia(bolsa2.id, usuario(dni), f.estudiantes);
+  }
+
   console.log("\nBolsa de prueba creada:", bolsa.nombre);
   console.log("Código público (vista de transparencia):", bolsa.codigoPublico);
   console.log("Código de invitación (unirse):", bolsa.codigoInvitacion);
@@ -189,6 +257,9 @@ async function main() {
   console.log(`Superadmin: DNI ${SUPERADMIN_DNI} / contraseña ${SUPERADMIN_PASSWORD}`);
   console.log(`Admin: DNI ${ADMIN_DNI} / contraseña ${ADMIN_PASSWORD}`);
   console.log("DNI del tesorero (panel del comité):", tesorero.dni);
+  console.log(`\nSegunda bolsa: ${bolsa2.nombre} (código de invitación ${bolsa2.codigoInvitacion})`);
+  console.log("Varias membresías (pasan por /elegir): 50111222 (comité en ambas), 40123456 (madre en ambas y secretaria en la 2.ª)");
+  console.log("La contraseña es la de su cuenta: comite2026 para 50111222, demo2026 para 40123456.");
 }
 
 main()

@@ -49,7 +49,10 @@ import {
 export type CrmFamiliaItem = {
   familia: {
     id: string;
+    /** Nombre completo, para mostrar. */
     nombre: string;
+    nombres: string;
+    apellidos: string;
     dni: string;
     celular: string;
     estudiantes: { id: string; nombre: string }[];
@@ -120,6 +123,7 @@ export function CrmDashboard({ bolsa, saldo, familias, pagos }: CrmDashboardProp
   const [familiaParaEditar, setFamiliaParaEditar] = useState<{
     id: string;
     nombre: string;
+    apellidos: string;
     dni: string;
     celular: string;
     estudiantes: { id?: string; nombre: string }[];
@@ -230,7 +234,8 @@ export function CrmDashboard({ bolsa, saldo, familias, pagos }: CrmDashboardProp
   function abrirModalEditar(item: CrmFamiliaItem) {
     setFamiliaParaEditar({
       id: item.familia.id,
-      nombre: item.familia.nombre,
+      nombre: item.familia.nombres,
+      apellidos: item.familia.apellidos,
       dni: item.familia.dni,
       celular: item.familia.celular,
       estudiantes: item.familia.estudiantes.map((e) => ({ id: e.id, nombre: e.nombre })),
@@ -264,7 +269,8 @@ export function CrmDashboard({ bolsa, saldo, familias, pagos }: CrmDashboardProp
 
   function handleGuardarEdicion() {
     if (!familiaParaEditar) return;
-    if (!familiaParaEditar.nombre.trim()) return toast.error("El nombre de la familia es requerido");
+    if (!familiaParaEditar.nombre.trim()) return toast.error("Los nombres del padre o madre son requeridos");
+    if (!familiaParaEditar.apellidos.trim()) return toast.error("Los apellidos del padre o madre son requeridos");
     if (!/^\d{8}$/.test(familiaParaEditar.dni.trim())) return toast.error("El DNI debe tener exactamente 8 dígitos");
     if (!/^\d{9}$/.test(familiaParaEditar.celular.trim())) return toast.error("El celular debe tener 9 dígitos");
     if (familiaParaEditar.estudiantes.some((e) => !e.nombre.trim())) {
@@ -275,6 +281,7 @@ export function CrmDashboard({ bolsa, saldo, familias, pagos }: CrmDashboardProp
       const res = await editarFamiliaAction({
         familiaId: familiaParaEditar.id,
         nombre: familiaParaEditar.nombre,
+        apellidos: familiaParaEditar.apellidos,
         dni: familiaParaEditar.dni,
         celular: familiaParaEditar.celular,
         estudiantes: familiaParaEditar.estudiantes.map((e) => ({
@@ -995,16 +1002,28 @@ export function CrmDashboard({ bolsa, saldo, familias, pagos }: CrmDashboardProp
 
           {familiaParaEditar && (
             <div className="space-y-4 py-2">
-              {/* Nombre completo */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Nombre completo del padre o apoderado</Label>
-                <Input
-                  value={familiaParaEditar.nombre}
-                  onChange={(e) =>
-                    setFamiliaParaEditar({ ...familiaParaEditar, nombre: e.target.value })
-                  }
-                  placeholder="Ej. Rosa Elena Quispe Mamani"
-                />
+              {/* Nombres y apellidos en 2 columnas */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Nombres del padre o apoderado</Label>
+                  <Input
+                    value={familiaParaEditar.nombre}
+                    onChange={(e) =>
+                      setFamiliaParaEditar({ ...familiaParaEditar, nombre: e.target.value })
+                    }
+                    placeholder="Ej. Rosa Elena"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Apellidos</Label>
+                  <Input
+                    value={familiaParaEditar.apellidos}
+                    onChange={(e) =>
+                      setFamiliaParaEditar({ ...familiaParaEditar, apellidos: e.target.value })
+                    }
+                    placeholder="Ej. Quispe Mamani"
+                  />
+                </div>
               </div>
 
               {/* DNI y Celular en 2 columnas */}

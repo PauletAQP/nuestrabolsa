@@ -1,9 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { hashSecret, generatePublicCode, generateInviteCode } from "@/lib/crypto";
+import { hashSecret, verifySecret, generatePublicCode, generateInviteCode } from "@/lib/crypto";
 import { createSession, getSession } from "@/lib/session";
 import { crearBolsaSchema, unirseSchema, type CrearBolsaInput, type UnirseInput } from "@/lib/schemas";
+import { inscribirEstudiantes } from "@/lib/inscripciones";
 import { redirect } from "next/navigation";
 
 export type FormResult =
@@ -30,40 +31,58 @@ export async function crearBolsaAction(input: CrearBolsaInput): Promise<FormResu
   const codigoInvitacion = generateInviteCode();
   const meta = data.cuota * data.estudiantesEsperados;
 
-  const tesorero = data.responsables.find((r) => r.rol === "tesorero");
-  if (!tesorero) {
-    return { ok: false, error: "Un responsable debe tener el rol de tesorero" };
+  // Un presidente, un tesorero y un secretario: cada cargo una sola vez.
+  const cargos = new Set(data.responsables.map((r) => r.cargo));
+  if (cargos.size !== data.responsables.length) {
+    return { ok: false, error: "Cada responsable debe tener un cargo distinto: presidente, tesorero y secretario" };
   }
 
-  await prisma.bolsa.create({
-    data: {
-      nombre: data.nombre,
-      colegio: data.colegio,
-      cuota: data.cuota,
-      estudiantesEsperados: data.estudiantesEsperados,
-      meta,
-      actaUri: data.actaUri,
-      codigoPublico,
-      codigoInvitacion,
-      estado: "activa",
-      createdById: session.usuarioId,
-      responsables: {
-        create: data.responsables.map((r) => {
-          const { hash, salt } = hashSecret(r.contrasena);
-          return {
+  await prisma.$transaction(async (tx) => {
+    // Cada responsable es un Usuario (cuenta única por DNI). Si ya existe se reutiliza
+    // tal cual: no se cambian su nombre ni su contraseña.
+    const usuarios: Awaited<ReturnType<typeof tx.usuario.create>>[] = [];
+    for (const r of data.responsables) {
+      const existente = await tx.usuario.findUnique({ where: { dni: r.dni } });
+      if (existente) {
+        usuarios.push(existente);
+        continue;
+      }
+      const { hash, salt } = hashSecret(r.contrasena);
+      usuarios.push(
+        await tx.usuario.create({
+          data: {
             nombre: r.nombre,
             apellidos: r.apellidos,
             dni: r.dni,
             celular: r.celular,
-            rol: r.rol,
-            esTesorero: r.rol === "tesorero",
             dniFotoUri: r.dniFotoUri,
+            rol: "usuario",
             contrasenaHash: hash,
             contrasenaSalt: salt,
-          };
-        }),
+            createdById: session.usuarioId,
+          },
+        })
+      );
+    }
+
+    await tx.bolsa.create({
+      data: {
+        nombre: data.nombre,
+        colegio: data.colegio,
+        cuota: data.cuota,
+        estudiantesEsperados: data.estudiantesEsperados,
+        meta,
+        actaUri: data.actaUri,
+        codigoPublico,
+        codigoInvitacion,
+        estado: "activa",
+        adminId: session.usuarioId,
+        createdById: session.usuarioId,
+        responsables: {
+          create: data.responsables.map((r, i) => ({ usuarioId: usuarios[i].id, cargo: r.cargo })),
+        },
       },
-    },
+    });
   });
 
   redirect("/admin");
@@ -81,26 +100,49 @@ export async function unirseAction(input: UnirseInput): Promise<FormResult> {
     return { ok: false, error: "El código de invitación no es válido" };
   }
 
-  const existente = await prisma.familia.findFirst({ where: { bolsaId: bolsa.id, dni: data.dni } });
-  if (existente) {
-    return { ok: false, error: "Ya existe una familia registrada con ese DNI en esta bolsa" };
+  // Cuenta única por DNI: si ya existe, debe confirmar su contraseña actual para unirse.
+  let usuario = await prisma.usuario.findUnique({ where: { dni: data.dni } });
+  if (usuario) {
+    if (!verifySecret(data.contrasena, usuario.contrasenaHash, usuario.contrasenaSalt)) {
+      return {
+        ok: false,
+        error: "Ya tienes una cuenta con ese DNI. Ingresa tu contraseña actual para unirte a esta bolsa",
+      };
+    }
+    const yaEsMiembro = await prisma.familia.findFirst({ where: { bolsaId: bolsa.id, usuarioId: usuario.id } });
+    if (yaEsMiembro) {
+      return { ok: false, error: "Ya perteneces a esta bolsa. Inicia sesión con tu DNI" };
+    }
   }
 
-  const { hash, salt } = hashSecret(data.contrasena);
-  const familia = await prisma.familia.create({
-    data: {
+  const familia = await prisma.$transaction(async (tx) => {
+    if (!usuario) {
+      const { hash, salt } = hashSecret(data.contrasena);
+      usuario = await tx.usuario.create({
+        data: {
+          nombre: data.nombre,
+          apellidos: data.apellidos,
+          dni: data.dni,
+          celular: data.celular,
+          rol: "usuario",
+          contrasenaHash: hash,
+          contrasenaSalt: salt,
+        },
+      });
+    }
+    const u = usuario;
+
+    const nueva = await tx.familia.create({ data: { bolsaId: bolsa.id, usuarioId: u.id } });
+
+    await inscribirEstudiantes(tx, {
       bolsaId: bolsa.id,
-      nombre: data.nombreFamilia,
-      dni: data.dni,
-      celular: data.celular,
-      contrasenaHash: hash,
-      contrasenaSalt: salt,
-      estudiantes: {
-        create: data.estudiantes.map((e) => ({ bolsaId: bolsa.id, nombre: e.nombre })),
-      },
-    },
+      familiaId: nueva.id,
+      apoderadoId: u.id,
+      nombres: data.estudiantes.map((e) => e.nombre),
+    });
+    return { id: nueva.id, usuarioId: u.id };
   });
 
-  await createSession({ tipo: "familia", familiaId: familia.id, bolsaId: bolsa.id });
+  await createSession({ tipo: "familia", usuarioId: familia.usuarioId, familiaId: familia.id, bolsaId: bolsa.id });
   redirect("/inicio");
 }

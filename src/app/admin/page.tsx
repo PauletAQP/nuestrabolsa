@@ -15,7 +15,10 @@ export default async function AdminPage() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <TopNav titulo="Nuestra Bolsa · Administrador" links={[{ href: "/crear", label: "Crear bolsa" }]} />
+      <TopNav titulo="Nuestra Bolsa · Administrador" links={[
+          { href: "/crear", label: "Crear bolsa" },
+          { href: "/elegir", label: "Mis bolsas" },
+        ]} />
       <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Mis bolsas</h1>

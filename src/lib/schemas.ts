@@ -20,7 +20,7 @@ export const responsableSchema = z.object({
   apellidos: z.string().min(2, "Apellidos requeridos"),
   dni,
   celular,
-  rol: z.enum(["tesorero", "presidente", "secretario"]),
+  cargo: z.enum(["tesorero", "presidente", "secretario"]),
   dniFotoUri: z.string().optional(),
   contrasena: z.string().min(6, "Mínimo 6 caracteres"),
 });
@@ -44,7 +44,8 @@ export const crearBolsaSchema = z.object({
 
 export const unirseSchema = z.object({
   codigoInvitacion: z.string().min(4),
-  nombreFamilia: z.string().min(2, "Nombre requerido"),
+  nombre: z.string().min(2, "Nombre requerido"),
+  apellidos: z.string().min(2, "Apellidos requeridos"),
   dni,
   celular,
   contrasena: z.string().min(6, "Mínimo 6 caracteres"),
@@ -75,7 +76,8 @@ export const decidirPagoSchema = z.object({
 
 export const editarFamiliaSchema = z.object({
   familiaId: z.string().min(1),
-  nombre: z.string().min(2, "El nombre de la familia es requerido"),
+  nombre: z.string().min(2, "Los nombres del padre o madre son requeridos"),
+  apellidos: z.string().min(2, "Los apellidos del padre o madre son requeridos"),
   dni,
   celular,
   estudiantes: z

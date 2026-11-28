@@ -11,6 +11,7 @@ export default async function InicioLayout({ children }: { children: React.React
           { href: "/inicio", label: "Inicio" },
           { href: "/inicio/aportar", label: "Aportar" },
           { href: "/inicio/pagos", label: "Pagos y movimientos" },
+          { href: "/elegir", label: "Mis bolsas" },
         ]}
       />
       <div className="flex-1">{children}</div>

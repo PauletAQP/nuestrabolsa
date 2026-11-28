@@ -23,7 +23,7 @@ export default async function CrmPage() {
         codigoPublico: bolsa.codigoPublico,
       }}
       saldo={saldo}
-      familias={familias as any}
+      familias={familias}
       pagos={pagos.map((p) => ({
         proveedor: p.proveedor,
         motivo: p.motivo,
