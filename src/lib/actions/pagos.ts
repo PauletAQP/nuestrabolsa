@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { appendRegistro } from "@/lib/registro";
 import { getSession } from "@/lib/session";
+import { getNombreResponsable } from "@/lib/queries";
 import { proponerPagoSchema, decidirPagoSchema, type ProponerPagoInput } from "@/lib/schemas";
 import { revalidatePath } from "next/cache";
 
@@ -21,7 +22,7 @@ export async function proponerPagoAction(input: ProponerPagoInput): Promise<Form
   }
   const data = parsed.data;
 
-  const proponente = await prisma.responsable.findUniqueOrThrow({ where: { id: session.responsableId } });
+  const proponente = { id: session.responsableId, nombre: await getNombreResponsable(session.responsableId) };
   const venceEn = new Date(Date.now() + DIAS_VENCIMIENTO * 24 * 60 * 60 * 1000);
 
   await prisma.$transaction(async (tx) => {
@@ -87,7 +88,7 @@ export async function decidirPagoAction(input: {
   const yaDecidio = pago.aprobaciones.some((a) => a.responsableId === session.responsableId);
   if (yaDecidio) return { ok: false, error: "Ya registraste una decisión sobre este pago" };
 
-  const responsable = await prisma.responsable.findUniqueOrThrow({ where: { id: session.responsableId } });
+  const responsable = { id: session.responsableId, nombre: await getNombreResponsable(session.responsableId) };
 
   if (data.decision === "rechazo") {
     await prisma.$transaction(async (tx) => {

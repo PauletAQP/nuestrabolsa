@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { appendRegistro } from "@/lib/registro";
 import { generateComprobanteCode } from "@/lib/crypto";
 import { getSession } from "@/lib/session";
+import { getFamiliaConEstudiantes } from "@/lib/queries";
 import { aportarSchema, type AportarInput } from "@/lib/schemas";
 import { revalidatePath } from "next/cache";
 
@@ -33,14 +34,11 @@ export async function aportarAction(input: AportarInput): Promise<FormResult> {
     return { ok: false, error: "El efectivo lo registra el tesorero" };
   }
 
-  const estudiante = await prisma.estudiante.findFirst({
-    where: { id: data.estudianteId, familiaId: session.familiaId },
-  });
+  const familia = await getFamiliaConEstudiantes(session.familiaId);
+  const estudiante = familia.estudiantes.find((e) => e.id === data.estudianteId);
   if (!estudiante) {
     return { ok: false, error: "Ese estudiante no pertenece a tu familia" };
   }
-
-  const familia = await prisma.familia.findUniqueOrThrow({ where: { id: session.familiaId } });
   const codigoComprobante = await uniqueComprobanteCode();
 
   await prisma.$transaction(async (tx) => {
@@ -85,10 +83,12 @@ export async function registrarEfectivoAction(input: {
     return { ok: false, error: "El monto mínimo es S/ 1" };
   }
 
-  const estudiante = await prisma.estudiante.findFirst({
-    where: { id: input.estudianteId, familiaId: input.familiaId, bolsaId: session.bolsaId },
+  const enBolsa = await prisma.familia.findFirst({
+    where: { id: input.familiaId, bolsaId: session.bolsaId, estado: "activa" },
+    select: { id: true },
   });
-  const familia = await prisma.familia.findFirst({ where: { id: input.familiaId, bolsaId: session.bolsaId } });
+  const familia = enBolsa ? await getFamiliaConEstudiantes(enBolsa.id) : null;
+  const estudiante = familia?.estudiantes.find((e) => e.id === input.estudianteId);
   if (!estudiante || !familia) {
     return { ok: false, error: "Familia o estudiante no encontrados en esta bolsa" };
   }

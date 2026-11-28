@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hashSecret, verifySecret, generatePublicCode, generateInviteCode } from "@/lib/crypto";
 import { createSession, getSession } from "@/lib/session";
 import { crearBolsaSchema, unirseSchema, type CrearBolsaInput, type UnirseInput } from "@/lib/schemas";
+import { inscribirEstudiantes } from "@/lib/inscripciones";
 import { redirect } from "next/navigation";
 
 export type FormResult =
@@ -156,14 +157,12 @@ export async function unirseAction(input: UnirseInput): Promise<FormResult> {
       },
     });
 
-    for (const e of data.estudiantes) {
-      const estudiante = await tx.estudiante.create({
-        data: { bolsaId: bolsa.id, familiaId: nueva.id, apoderadoId: u.id, nombre: e.nombre },
-      });
-      await tx.inscripcion.create({
-        data: { bolsaId: bolsa.id, familiaId: nueva.id, estudianteId: estudiante.id },
-      });
-    }
+    await inscribirEstudiantes(tx, {
+      bolsaId: bolsa.id,
+      familiaId: nueva.id,
+      apoderadoId: u.id,
+      nombres: data.estudiantes.map((e) => e.nombre),
+    });
     return { id: nueva.id, usuarioId: u.id };
   });
 

@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { hashSecret, generatePublicCode, generateInviteCode, generateComprobanteCode } from "../src/lib/crypto";
 import { appendRegistro } from "../src/lib/registro";
+import { inscribirEstudiantes } from "../src/lib/inscripciones";
 
 const prisma = new PrismaClient();
 
@@ -63,14 +64,13 @@ async function crearFamilia(bolsaId: string, u: UsuarioSeed, nombresEstudiantes:
   const familia = await prisma.familia.create({
     data: { bolsaId, usuarioId: u.id, nombre: `${u.nombre} ${u.apellidos}`, dni: u.dni, celular: u.celular },
   });
-  const estudiantes = [];
-  for (const nombre of nombresEstudiantes) {
-    const estudiante = await prisma.estudiante.create({
-      data: { bolsaId, familiaId: familia.id, apoderadoId: u.id, nombre },
-    });
-    await prisma.inscripcion.create({ data: { bolsaId, familiaId: familia.id, estudianteId: estudiante.id } });
-    estudiantes.push(estudiante);
-  }
+  // Si el padre ya inscribió a sus hijos en otra bolsa, se reutilizan los mismos estudiantes.
+  const estudiantes = await inscribirEstudiantes(prisma, {
+    bolsaId,
+    familiaId: familia.id,
+    apoderadoId: u.id,
+    nombres: nombresEstudiantes,
+  });
   return { familia, estudiantes };
 }
 

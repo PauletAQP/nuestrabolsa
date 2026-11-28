@@ -3,10 +3,15 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { editarFamiliaSchema, type EditarFamiliaInput } from "@/lib/schemas";
+import { inscribirEstudiantes } from "@/lib/inscripciones";
 import { revalidatePath } from "next/cache";
 
 export type FormResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * El comité edita los datos de un padre y los hijos inscritos en su bolsa.
+ * Los datos personales viven en Usuario (cuenta única), así que el cambio se ve en todas sus bolsas.
+ */
 export async function editarFamiliaAction(input: EditarFamiliaInput): Promise<FormResult> {
   const session = await getSession();
   if (!session || session.tipo !== "responsable") {
@@ -17,83 +22,66 @@ export async function editarFamiliaAction(input: EditarFamiliaInput): Promise<Fo
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   }
-
   const data = parsed.data;
 
-  // Verificar que la familia pertenece a la bolsa del comité
+  // La familia debe pertenecer a la bolsa del comité
   const familia = await prisma.familia.findFirst({
     where: { id: data.familiaId, bolsaId: session.bolsaId },
-    include: { estudiantes: true },
+    include: { usuario: true, inscripciones: { select: { estudianteId: true } } },
   });
-
-  if (!familia) {
+  if (!familia?.usuario) {
     return { ok: false, error: "La familia no existe o no pertenece a esta bolsa" };
   }
+  const usuario = familia.usuario;
 
-  // Si cambia el DNI, validar que no exista duplicado en esta bolsa
-  if (data.dni !== familia.dni) {
-    const duplicado = await prisma.familia.findFirst({
-      where: {
-        bolsaId: session.bolsaId,
-        dni: data.dni,
-        id: { not: data.familiaId },
-      },
-    });
-
+  // El DNI identifica a la cuenta: no puede repetirse en toda la plataforma
+  const dni = data.dni.trim();
+  if (dni !== usuario.dni) {
+    const duplicado = await prisma.usuario.findUnique({ where: { dni } });
     if (duplicado) {
-      return { ok: false, error: "Ya existe otra familia con ese número de DNI en esta bolsa" };
+      return { ok: false, error: "Ya existe otra cuenta con ese número de DNI" };
     }
   }
 
-  // Aplicar cambios en una transacción
+  // Solo se pueden editar estudiantes inscritos por esta familia en esta bolsa
+  const inscritos = new Set(familia.inscripciones.map((i) => i.estudianteId));
+  const existentes = data.estudiantes
+    .filter((e) => e.id && !e.id.startsWith("nuevo_"))
+    .map((e) => ({ id: e.id as string, nombre: e.nombre.trim() }));
+  if (existentes.some((e) => !inscritos.has(e.id))) {
+    return { ok: false, error: "Uno de los estudiantes no pertenece a esta familia" };
+  }
+  const nuevos = data.estudiantes
+    .filter((e) => !e.id || e.id.startsWith("nuevo_"))
+    .map((e) => e.nombre.trim());
+
   await prisma.$transaction(async (tx) => {
-    // 1. Actualizar datos principales de la familia
-    await tx.familia.update({
-      where: { id: familia.id },
+    await tx.usuario.update({
+      where: { id: usuario.id },
       data: {
         nombre: data.nombre.trim(),
-        dni: data.dni.trim(),
+        apellidos: data.apellidos.trim(),
+        dni,
         celular: data.celular.trim(),
       },
     });
 
-    // 2. Gestionar estudiantes
-    const estudiantesEntrantes = data.estudiantes.map((e) => ({
-      id: e.id && !e.id.startsWith("nuevo_") ? e.id : undefined,
-      nombre: e.nombre.trim(),
-    }));
+    // Quitar de la bolsa a los estudiantes que ya no están en la lista. El Estudiante
+    // se conserva: puede tener aportes o estar inscrito en otras bolsas.
+    await tx.inscripcion.deleteMany({
+      where: { familiaId: familia.id, estudianteId: { notIn: existentes.map((e) => e.id) } },
+    });
 
-    const idsParaMantener = estudiantesEntrantes
-      .map((e) => e.id)
-      .filter((id): id is string => Boolean(id));
-
-    // Borrar estudiantes que ya no están en la lista
-    if (idsParaMantener.length > 0) {
-      await tx.estudiante.deleteMany({
-        where: {
-          familiaId: familia.id,
-          id: { notIn: idsParaMantener },
-        },
-      });
+    for (const est of existentes) {
+      await tx.estudiante.update({ where: { id: est.id }, data: { nombre: est.nombre } });
     }
 
-    // Actualizar los existentes y crear los nuevos
-    for (const est of estudiantesEntrantes) {
-      if (est.id) {
-        await tx.estudiante.update({
-          where: { id: est.id },
-          data: { nombre: est.nombre },
-        });
-      } else {
-        await tx.estudiante.create({
-          data: {
-            bolsaId: session.bolsaId,
-            familiaId: familia.id,
-            nombre: est.nombre,
-          },
-        });
-      }
-    }
+    await inscribirEstudiantes(tx, {
+      bolsaId: session.bolsaId,
+      familiaId: familia.id,
+      apoderadoId: usuario.id,
+      nombres: nuevos,
+    });
   });
 
   revalidatePath("/comite/crm");

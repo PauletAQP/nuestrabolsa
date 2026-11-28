@@ -1,4 +1,4 @@
-import { requireResponsable, getEfectivoPorConfirmar } from "@/lib/queries";
+import { requireResponsable, getEfectivoPorConfirmar, getFamiliasBolsa } from "@/lib/queries";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatSoles, formatFechaLima } from "@/lib/format";
@@ -9,7 +9,7 @@ export default async function EfectivoPage() {
   const session = await requireResponsable();
   const [responsable, familias, pendientes] = await Promise.all([
     prisma.responsable.findUniqueOrThrow({ where: { id: session.responsableId } }),
-    prisma.familia.findMany({ where: { bolsaId: session.bolsaId }, include: { estudiantes: true }, orderBy: { nombre: "asc" } }),
+    getFamiliasBolsa(session.bolsaId),
     getEfectivoPorConfirmar(session.bolsaId),
   ]);
 

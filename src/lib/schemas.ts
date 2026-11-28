@@ -76,7 +76,8 @@ export const decidirPagoSchema = z.object({
 
 export const editarFamiliaSchema = z.object({
   familiaId: z.string().min(1),
-  nombre: z.string().min(2, "El nombre de la familia es requerido"),
+  nombre: z.string().min(2, "Los nombres del padre o madre son requeridos"),
+  apellidos: z.string().min(2, "Los apellidos del padre o madre son requeridos"),
   dni,
   celular,
   estudiantes: z
