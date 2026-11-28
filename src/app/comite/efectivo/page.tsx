@@ -15,7 +15,7 @@ export default async function EfectivoPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 px-4 py-8">
-      {responsable.esTesorero ? (
+      {responsable.rol === "tesorero" ? (
         <Card>
           <CardHeader>
             <CardTitle>Registrar efectivo recibido</CardTitle>
@@ -56,7 +56,7 @@ export default async function EfectivoPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-medium">{formatSoles(a.monto)}</span>
-                    {a.registradoPor !== session.responsableId ? (
+                    {a.registradoPorId !== session.responsableId ? (
                       <ConfirmarEfectivoButton aporteId={a.id} />
                     ) : (
                       <span className="text-xs text-muted-foreground">Esperando a otro responsable</span>

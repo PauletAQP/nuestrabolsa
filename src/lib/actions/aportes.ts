@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { appendRegistro } from "@/lib/registro";
 import { generateComprobanteCode } from "@/lib/crypto";
 import { getSession } from "@/lib/session";
-import { getFamiliaConEstudiantes } from "@/lib/queries";
+import { getFamiliaConEstudiantes, getNombreResponsable } from "@/lib/queries";
 import { aportarSchema, type AportarInput } from "@/lib/schemas";
 import { revalidatePath } from "next/cache";
 
@@ -58,7 +58,7 @@ export async function aportarAction(input: AportarInput): Promise<FormResult> {
         monto: data.monto,
         medio: data.medio,
         estado: "confirmado",
-        registradoPor: familia.id,
+        // registradoPorId = null: lo registró el propio padre.
         codigoComprobante,
         registroId: registro.id,
       },
@@ -93,7 +93,10 @@ export async function registrarEfectivoAction(input: {
     return { ok: false, error: "Familia o estudiante no encontrados en esta bolsa" };
   }
 
-  const codigoComprobante = await uniqueComprobanteCode();
+  const [codigoComprobante, registradoPorNombre] = await Promise.all([
+    uniqueComprobanteCode(),
+    getNombreResponsable(session.responsableId),
+  ]);
 
   await prisma.aporte.create({
     data: {
@@ -105,7 +108,8 @@ export async function registrarEfectivoAction(input: {
       monto: input.monto,
       medio: "efectivo",
       estado: "por_confirmar",
-      registradoPor: session.responsableId,
+      registradoPorId: session.responsableId,
+      registradoPorNombre,
       codigoComprobante,
     },
   });
@@ -127,7 +131,7 @@ export async function confirmarEfectivoAction(aporteId: string): Promise<FormRes
   if (!aporte || aporte.estado !== "por_confirmar") {
     return { ok: false, error: "Este aporte ya no está pendiente de confirmación" };
   }
-  if (aporte.registradoPor === session.responsableId) {
+  if (aporte.registradoPorId === session.responsableId) {
     return { ok: false, error: "Otro responsable debe confirmar este efectivo, no quien lo registró" };
   }
 
@@ -140,7 +144,7 @@ export async function confirmarEfectivoAction(aporteId: string): Promise<FormRes
 
     await tx.aporte.update({
       where: { id: aporte.id },
-      data: { estado: "confirmado", confirmadoPor: session.responsableId, registroId: registro.id },
+      data: { estado: "confirmado", confirmadoPorId: session.responsableId, registroId: registro.id },
     });
   });
 

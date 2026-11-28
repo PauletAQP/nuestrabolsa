@@ -90,7 +90,6 @@ export async function crearBolsaAction(input: CrearBolsaInput): Promise<FormResu
               celular: u.celular,
               dniFotoUri: u.dniFotoUri ?? r.dniFotoUri,
               rol: r.rol,
-              esTesorero: r.rol === "tesorero",
             };
           }),
         },

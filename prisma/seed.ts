@@ -54,7 +54,6 @@ async function crearResponsable(bolsaId: string, u: UsuarioSeed, rol: "tesorero"
       dni: u.dni,
       celular: u.celular,
       rol,
-      esTesorero: rol === "tesorero",
     },
   });
 }
@@ -193,7 +192,6 @@ async function main() {
           monto: cuota,
           medio: "yape",
           estado: "confirmado",
-          registradoPor: e.familiaId,
           codigoComprobante: generateComprobanteCode(),
           registroId: registro.id,
         },
