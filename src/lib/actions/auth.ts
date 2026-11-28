@@ -19,7 +19,8 @@ export async function loginAction(_prev: ActionResult | null, formData: FormData
   const { dni, contrasena } = parsed.data;
 
   const usuario = await prisma.usuario.findUnique({ where: { dni } });
-  if (usuario && verifySecret(contrasena, usuario.contrasenaHash, usuario.contrasenaSalt)) {
+  // El rol "usuario" (padres y comité con cuenta única) aún no tiene login propio.
+  if (usuario && usuario.rol !== "usuario" && verifySecret(contrasena, usuario.contrasenaHash, usuario.contrasenaSalt)) {
     await createSession({ tipo: "usuario", usuarioId: usuario.id, rol: usuario.rol });
     redirect(usuario.rol === "superadmin" ? "/superadmin" : "/admin");
   }
