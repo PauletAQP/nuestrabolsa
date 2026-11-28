@@ -2,13 +2,13 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoginForm } from "@/components/nb/login-form";
 import { getSession } from "@/lib/session";
+import { destinoParaSesion } from "@/lib/ingreso";
 import { redirect } from "next/navigation";
 
 export default async function Home() {
   const session = await getSession();
-  if (session?.tipo === "familia") redirect("/inicio");
-  if (session?.tipo === "responsable") redirect("/comite");
-  if (session?.tipo === "usuario") redirect(session.rol === "superadmin" ? "/superadmin" : "/admin");
+  // Sesiones antiguas (antes de la cuenta única) no traen usuarioId: se ignoran.
+  if (session?.usuarioId) redirect(destinoParaSesion(session));
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 gap-10">

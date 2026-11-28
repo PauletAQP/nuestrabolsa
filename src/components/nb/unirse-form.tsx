@@ -9,7 +9,8 @@ import { unirseAction } from "@/lib/actions/bolsa";
 import { Trash2, Plus } from "lucide-react";
 
 export function UnirseForm({ codigoInvitacion }: { codigoInvitacion: string }) {
-  const [nombreFamilia, setNombreFamilia] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [apellidos, setApellidos] = useState("");
   const [dni, setDni] = useState("");
   const [celular, setCelular] = useState("");
   const [contrasena, setContrasena] = useState("");
@@ -17,7 +18,8 @@ export function UnirseForm({ codigoInvitacion }: { codigoInvitacion: string }) {
   const [pending, startTransition] = useTransition();
 
   function enviar() {
-    if (!nombreFamilia.trim()) return toast.error("Ingresa tu nombre");
+    if (!nombre.trim()) return toast.error("Ingresa tu nombre");
+    if (!apellidos.trim()) return toast.error("Ingresa tus apellidos");
     if (!/^\d{8}$/.test(dni)) return toast.error("El DNI debe tener 8 dígitos");
     if (!/^\d{9}$/.test(celular)) return toast.error("El celular debe tener 9 dígitos");
     if (contrasena.length < 6) return toast.error("La contraseña debe tener al menos 6 caracteres");
@@ -27,7 +29,8 @@ export function UnirseForm({ codigoInvitacion }: { codigoInvitacion: string }) {
     startTransition(async () => {
       const res = await unirseAction({
         codigoInvitacion,
-        nombreFamilia,
+        nombre,
+        apellidos,
         dni,
         celular,
         contrasena,
@@ -40,8 +43,12 @@ export function UnirseForm({ codigoInvitacion }: { codigoInvitacion: string }) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Tu nombre</Label>
-        <Input value={nombreFamilia} onChange={(e) => setNombreFamilia(e.target.value)} placeholder="Nombre del padre o madre" />
+        <Label>Nombres</Label>
+        <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombres del padre o madre" />
+      </div>
+      <div className="space-y-2">
+        <Label>Apellidos</Label>
+        <Input value={apellidos} onChange={(e) => setApellidos(e.target.value)} />
       </div>
       <div className="space-y-2">
         <Label>DNI (será tu usuario)</Label>
@@ -53,6 +60,7 @@ export function UnirseForm({ codigoInvitacion }: { codigoInvitacion: string }) {
       </div>
       <div className="space-y-2">
         <Label>Contraseña</Label>
+        <p className="text-xs text-muted-foreground">Si ya tienes cuenta en otra bolsa, usa tu contraseña actual.</p>
         <Input type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} />
       </div>
 

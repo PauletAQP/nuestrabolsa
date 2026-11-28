@@ -17,6 +17,7 @@ export default async function ComiteLayout({ children }: { children: React.React
           { href: "/comite/familias", label: "Familias" },
           { href: "/comite/efectivo", label: "Efectivo" },
           { href: "/comite/crm", label: "CRM" },
+          { href: "/elegir", label: "Mis bolsas" },
         ]}
       />
       <div className="flex-1">{children}</div>

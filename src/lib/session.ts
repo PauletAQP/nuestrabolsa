@@ -7,10 +7,17 @@ const secret = new TextEncoder().encode(
   process.env.SESSION_SECRET ?? "dev-secret-change-in-production-please-use-a-long-random-string-32chars"
 );
 
+/**
+ * Toda sesión pertenece a un Usuario (identidad única por DNI).
+ * - "pendiente": inició sesión pero aún no eligió con qué bolsa/membresía entrar (/elegir).
+ * - "usuario": panel global de superadmin o admin.
+ * - "familia" / "responsable": membresía activa en una bolsa.
+ */
 export type SessionPayload =
-  | { tipo: "familia"; familiaId: string; bolsaId: string }
+  | { tipo: "pendiente"; usuarioId: string }
   | { tipo: "usuario"; usuarioId: string; rol: "superadmin" | "admin" }
-  | { tipo: "responsable"; responsableId: string; bolsaId: string; rol: string };
+  | { tipo: "familia"; usuarioId: string; familiaId: string; bolsaId: string }
+  | { tipo: "responsable"; usuarioId: string; responsableId: string; bolsaId: string; rol: string };
 
 export async function createSession(payload: SessionPayload) {
   const token = await new SignJWT({ ...payload })
